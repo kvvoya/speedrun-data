@@ -11,6 +11,8 @@
   "license": "ISC",
   "dependencies": {
     "chalk": "^5.3.0",
+    "clear": "^0.1.0",
     "puppeteer": "^20.7.4"
-  }
+  },
+  "type": "module"
 }
