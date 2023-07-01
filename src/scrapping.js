@@ -1,10 +1,21 @@
 import puppeteer from 'puppeteer';
 import chalk from 'chalk';
+import xlsx from 'xlsx';
+
+class Category {
+   constructor(link, runs, wrTime) {
+      this.link = link;
+      this.runs = runs;
+      this.wrTime = wrTime;
+   }
+}
 
 const validUrlRegex = /^(ftp|http|https):\/\/[^ "]+$/;
 
-async function scrapeCategoryLinks(page, link, oldLinks = []) {
+const categoriesOutput = [];
 
+async function scrapeCategoryLinks(page, link, oldLinks = []) {
+   link = addLevelToPath(link);
    await page.goto(link);
 
    let filteredCategoryLinks = [];
@@ -47,12 +58,68 @@ async function scrapeCategoryLinks(page, link, oldLinks = []) {
 
    console.log(chalk.cyan(`Went into ${link}`));
 
+   const category = await createCategoryObject(page, link);
+   categoriesOutput.push(category);
+
    return Array.from(filteredCategoryLinksSet);
+}
+
+async function createCategoryObject(page, link) {
+
+   await page.waitForTimeout(100);
+
+   const runsElement = await page.$('div.flex.px-4.py-3 .text-sm.text-on-panel');
+   const runsAmount = await page.$$eval('a .inline-flex.flex-nowrap.justify-start.items-end.gap-1', elements => elements.length);
+   const wrTimeElement = await page.$('#game-leaderboard tbody tr td:nth-child(3) a span');
+
+   console.log('Runs element:', runsElement);
+
+   let runs = 0;
+   let wrTime = 0;
+
+   if (runsElement && runsAmount === 200) {
+      const runsText = await page.evaluate(element => element.textContent, runsElement);
+      console.log('Runs text:', runsText);
+      const runsMatch = runsText.match(/(\d+)\s*runs/);
+      runs = runsMatch ? parseInt(runsMatch[1], 10) : 0;
+   } else if (runsAmount) {
+      runs = runsAmount ? parseInt(runsAmount, 10) : 0;
+   }
+
+   if (wrTimeElement) {
+      const wrTimeText = await page.evaluate(element => element.textContent, wrTimeElement);
+      console.log('WR text:', wrTimeText);
+      const wrTimeMatch = wrTimeText.match(/((\d+)\s*h)?\s*(\d+)\s*m\s*(\d+)\s*s\s*(\d+)\s*ms/);
+      const wrHours = wrTimeMatch && wrTimeMatch[2] ? parseInt(wrTimeMatch[2], 10) : 0;
+      const wrMinutes = wrTimeMatch ? parseInt(wrTimeMatch[3], 10) : 0;
+      const wrSeconds = wrTimeMatch ? parseInt(wrTimeMatch[4], 10) : 0;
+      const wrMiliseconds = wrTimeMatch ? parseInt(wrTimeMatch[5], 10) : 0;
+      wrTime = wrHours * 3600000 + wrMinutes * 60000 + wrSeconds * 1000 + wrMiliseconds;
+   }
+
+   const category = new Category(link, runs, wrTime);
+   console.log(chalk.magenta(`Created an object. Link: ${link}. Runs: ${runs}. WR Time: ${wrTime}`))
+
+   return runs > 0 ? category : null;
 }
 
 function filterToLevelLinks(links) {
    const filteredLevelLinks = Array.from(new Set(links.filter(link => link.includes('/level/'))));
    return filteredLevelLinks;
+}
+
+function addLevelToPath(link) {
+   const url = new URL(link);
+   
+   if (url.pathname.includes('/level/')) {
+      return link;
+   }
+
+   const segments = url.pathname.split('/');
+   segments.splice(segments.length - 1, 0, 'level');
+
+   url.pathname = segments.join('/');
+   return url.href;
 }
 
 export async function scrapeWebsite(link) {
@@ -124,4 +191,27 @@ export async function scrapeWebsite(link) {
    console.log(chalk.black.bgGreen(`Found ${categoryLinksArray.length} categories.`));
 
    await browser.close();
+
+   createExcelSpreadsheet();
+}
+
+function createExcelSpreadsheet() {
+   const workbook = xlsx.utils.book_new();
+   const worksheet = xlsx.utils.json_to_sheet([]);
+
+   const headers = ['Category', 'Runs', 'WR Time'];
+   xlsx.utils.sheet_add_aoa(worksheet, [headers], { origin: 'A1' });
+
+   const categoriesData = categoriesOutput
+      .filter((category) => category !== null)
+      .map((category) => [category.link, category.runs, category.wrTime]);
+
+   xlsx.utils.sheet_add_aoa(worksheet, categoriesData, { origin: 'A2'});
+
+   xlsx.utils.book_append_sheet(workbook, worksheet, 'Categories');
+
+   const excelFileName = 'speedrun_data.xlsx';
+   xlsx.writeFile(workbook, excelFileName);
+
+   console.log(chalk.green(`Data saved in ${excelFileName}`));
 }
