@@ -1,21 +1,19 @@
 {
-  "name": "speedrun_data",
-  "version": "0.1.0",
-  "description": "Speedrun Data is a program that gets some data I like to see from speedrun.com",
-  "main": "./src/index.js",
+  "name": "sr",
+  "version": "1.0.0",
+  "description": "",
+  "main": "HI_MADDIE_I_LOVE_YOU.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node src/index.js",
-    "build": "nexe -i src/index.js -o dist/app.exe"
+    "start": "node src/index.js"
   },
   "keywords": [],
-  "author": "kvvoya",
+  "author": "",
   "license": "ISC",
   "dependencies": {
     "chalk": "^5.3.0",
     "clear": "^0.1.0",
-    "puppeteer": "^20.7.4",
-    "scrapping": "./src/scrapping.js"
+    "puppeteer": "^20.7.4"
   },
   "type": "module"
 }

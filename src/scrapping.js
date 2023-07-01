@@ -1,25 +1,21 @@
 import puppeteer from 'puppeteer';
 import chalk from 'chalk';
 
-class Category {
-   constructor(link, runs, wrTime) {
-      this.link = link;
-      this.runs = runs;
-      this.wrTime = wrTime;
-   }
-}
-
 const validUrlRegex = /^(ftp|http|https):\/\/[^ "]+$/;
 
 async function scrapeCategoryLinks(page, link, oldLinks = []) {
+
    await page.goto(link);
 
    let filteredCategoryLinks = [];
+
    const dropdownElements = await page.$$('.py-1.px-2.text-sm.border.border-solid.border-divider.rounded-lg.cursor-pointer.transition-all.duration-200');
 
    if (dropdownElements.length > 0) {
       for (const dropdownElement of dropdownElements) {
          await dropdownElement.click();
+         // await page.waitForNavigation();
+
          const links = await page.$$eval('a', elements => elements.map(el => el.href));
          const filteredLinks = links.filter(link => 
             link.includes('?h=') &&
@@ -38,6 +34,7 @@ async function scrapeCategoryLinks(page, link, oldLinks = []) {
       }
    } else {
       const categoryLinks = await page.$$eval('a', elements => elements.map(el => el.href));
+
       filteredCategoryLinks = categoryLinks.filter(link => 
          link.includes('?h=') &&
          !link.includes('&page=') && 
@@ -47,15 +44,19 @@ async function scrapeCategoryLinks(page, link, oldLinks = []) {
    }
 
    const filteredCategoryLinksSet = new Set(filteredCategoryLinks);
+
    console.log(chalk.cyan(`Went into ${link}`));
+
    return Array.from(filteredCategoryLinksSet);
 }
 
 function filterToLevelLinks(links) {
-   return Array.from(new Set(links.filter(link => link.includes('/level/'))));
+   const filteredLevelLinks = Array.from(new Set(links.filter(link => link.includes('/level/'))));
+   return filteredLevelLinks;
 }
 
 export async function scrapeWebsite(link) {
+
    const browserOptions = {
       headless: 'old'
    };
@@ -68,6 +69,7 @@ export async function scrapeWebsite(link) {
    }
 
    const page = await browser.newPage();
+
    await page.goto(link);
 
    const leaderboardElement = await page.$('#leaderboard-dropdown');
@@ -95,6 +97,7 @@ export async function scrapeWebsite(link) {
       categoryLinks.forEach(categoryLink => categoryLinksSet.add(categoryLink));
    }
 
+   
    console.log('------------');
    console.log(chalk.greenBright('Going through ILs....'));
    
