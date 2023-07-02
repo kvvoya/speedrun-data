@@ -17,7 +17,26 @@ const r1 = readline.createInterface({
 
 displayWelcomeMessage();
 
-r1.question('Enter a speedrun.com link to scrape: ', async (link) => {
+while (true) {
+   const link = await askQuestion('Enter a speedrun.com link to scrape: ');
+   if (link.toLowerCase() === 'exit') {
+      break;
+   }
+
    await scrapeWebsite(link);
-   r1.close();
-})
+}
+
+r1.close();
+
+// r1.question('Enter a speedrun.com link to scrape: ', async (link) => {
+//    await scrapeWebsite(link);
+//    r1.close();
+// })
+
+function askQuestion(q) {
+   return new Promise((resolve) => {
+      r1.question(q, (a) => {
+         resolve(a);
+      });
+   });
+}
