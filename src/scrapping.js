@@ -15,8 +15,11 @@ class Category {
 
 const validUrlRegex = /^(ftp|http|https):\/\/[^ "]+$/;
 const categoriesOutput = [];
+const processedLinks = [];
 
 async function scrapeCategoryLinks(page, link, oldLinks = [], isLevelCategory = false) {
+   if (processedLinks.includes(link)) return;
+
    if (isLevelCategory) {
       link = addLevelToPath(link);
    }
@@ -69,6 +72,7 @@ async function scrapeCategoryLinks(page, link, oldLinks = [], isLevelCategory = 
 
    const category = await createCategoryObject(page, link);
    categoriesOutput.push(category);
+   processedLinks.push(link);
 
    return Array.from(filteredCategoryLinksSet);
 }
@@ -154,7 +158,7 @@ export async function scrapeWebsite(link) {
       return;
    }
 
-   categoriesOutput.length = 0; // clear an array
+   categoriesOutput.length = 0; processedLinks.length = 0; // clears arrays
    const page = await browser.newPage();
 
    await page.goto(link);
