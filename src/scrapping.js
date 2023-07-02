@@ -1,21 +1,26 @@
 import puppeteer from 'puppeteer';
 import chalk from 'chalk';
 import xlsx from 'xlsx';
+import fs from 'fs';
+import path from 'path';
 
 class Category {
-   constructor(link, runs, wrTime) {
+   constructor(title, runs, wrTime, link) {
       this.link = link;
+      this.title = title;
       this.runs = runs;
       this.wrTime = wrTime;
    }
 }
 
 const validUrlRegex = /^(ftp|http|https):\/\/[^ "]+$/;
-
 const categoriesOutput = [];
 
-async function scrapeCategoryLinks(page, link, oldLinks = []) {
-   link = addLevelToPath(link);
+async function scrapeCategoryLinks(page, link, oldLinks = [], isLevelCategory = false) {
+   if (isLevelCategory) {
+      link = addLevelToPath(link);
+   }
+
    await page.goto(link);
 
    let filteredCategoryLinks = [];
@@ -40,9 +45,11 @@ async function scrapeCategoryLinks(page, link, oldLinks = []) {
       }
 
       for (const filteredLink of filteredCategoryLinks) {
-         const categoryLinks = await scrapeCategoryLinks(page, filteredLink, [...oldLinks, ...filteredCategoryLinks]);
+         const categoryLinks = await scrapeCategoryLinks(page, filteredLink, [...oldLinks, ...filteredCategoryLinks], isLevelCategory);
          filteredCategoryLinks = filteredCategoryLinks.concat(categoryLinks);
       }
+
+      await page.goto(link);
    } else {
       const categoryLinks = await page.$$eval('a', elements => elements.map(el => el.href));
 
@@ -56,6 +63,7 @@ async function scrapeCategoryLinks(page, link, oldLinks = []) {
 
    const filteredCategoryLinksSet = new Set(filteredCategoryLinks);
 
+
    console.log(chalk.cyan(`Went into ${link}`));
 
    const category = await createCategoryObject(page, link);
@@ -67,12 +75,14 @@ async function scrapeCategoryLinks(page, link, oldLinks = []) {
 async function createCategoryObject(page, link) {
 
    await page.waitForTimeout(100);
+   const pageTitle = await page.title();
+
+   const cleanedTitle = cleanTitle(pageTitle);
+   console.log('Page title:', cleanedTitle);
 
    const runsElement = await page.$('div.flex.px-4.py-3 .text-sm.text-on-panel');
    const runsAmount = await page.$$eval('a .inline-flex.flex-nowrap.justify-start.items-end.gap-1', elements => elements.length);
    const wrTimeElement = await page.$('#game-leaderboard tbody tr td:nth-child(3) a span');
-
-   console.log('Runs element:', runsElement);
 
    let runs = 0;
    let wrTime = 0;
@@ -89,18 +99,26 @@ async function createCategoryObject(page, link) {
    if (wrTimeElement) {
       const wrTimeText = await page.evaluate(element => element.textContent, wrTimeElement);
       console.log('WR text:', wrTimeText);
-      const wrTimeMatch = wrTimeText.match(/((\d+)\s*h)?\s*(\d+)\s*m\s*(\d+)\s*s\s*(\d+)\s*ms/);
-      const wrHours = wrTimeMatch && wrTimeMatch[2] ? parseInt(wrTimeMatch[2], 10) : 0;
-      const wrMinutes = wrTimeMatch ? parseInt(wrTimeMatch[3], 10) : 0;
-      const wrSeconds = wrTimeMatch ? parseInt(wrTimeMatch[4], 10) : 0;
-      const wrMiliseconds = wrTimeMatch ? parseInt(wrTimeMatch[5], 10) : 0;
+      const wrTimeMatch = wrTimeText.match(/(?:(\d+)\s*h)?\s*(?:(\d+)\s*m)?\s*(?:(\d+)\s*s)?\s*(?:(\d+)\s*ms)?/);
+      const wrHours = wrTimeMatch ? parseInt(wrTimeMatch[1], 10) || 0 : 0;
+      const wrMinutes = wrTimeMatch ? parseInt(wrTimeMatch[2], 10) || 0 : 0;
+      const wrSeconds = wrTimeMatch ? parseInt(wrTimeMatch[3], 10) || 0 : 0;
+      const wrMiliseconds = wrTimeMatch ? parseInt(wrTimeMatch[4], 10) || 0 : 0;
       wrTime = wrHours * 3600000 + wrMinutes * 60000 + wrSeconds * 1000 + wrMiliseconds;
    }
 
-   const category = new Category(link, runs, wrTime);
+   const category = new Category(cleanedTitle, runs, wrTime, link);
    console.log(chalk.magenta(`Created an object. Link: ${link}. Runs: ${runs}. WR Time: ${wrTime}`))
 
    return runs > 0 ? category : null;
+}
+
+const cleanTitle = (title) => {
+   const gameNameIndex = title.lastIndexOf(' - ');
+   if (gameNameIndex !== -1) {
+      return title.substring(0, gameNameIndex).trim();
+   }
+   return title;
 }
 
 function filterToLevelLinks(links) {
@@ -181,7 +199,7 @@ export async function scrapeWebsite(link) {
       )));
 
       for (const filteredLink of filteredLinks) {
-         const categoryLinks = await scrapeCategoryLinks(page, filteredLink, filteredLinks);
+         const categoryLinks = await scrapeCategoryLinks(page, filteredLink, filteredLinks, true);
          categoryLinks.forEach(categoryLink => categoryLinksSet.add(categoryLink));
       }
    }
@@ -199,18 +217,35 @@ function createExcelSpreadsheet() {
    const workbook = xlsx.utils.book_new();
    const worksheet = xlsx.utils.json_to_sheet([]);
 
-   const headers = ['Category', 'Runs', 'WR Time'];
+   const headers = ['Category', 'Runs', 'WR Time', 'Link'];
+
    xlsx.utils.sheet_add_aoa(worksheet, [headers], { origin: 'A1' });
 
    const categoriesData = categoriesOutput
       .filter((category) => category !== null)
-      .map((category) => [category.link, category.runs, category.wrTime]);
+      .map((category) => [category.title, category.runs, category.wrTime, category.link]);
 
    xlsx.utils.sheet_add_aoa(worksheet, categoriesData, { origin: 'A2'});
 
+   const columnTitleLen = categoriesData.map(row => row[0].length);
+   const maxTitleLen = Math.max(...columnTitleLen);
+   worksheet['!cols'] = [{width: maxTitleLen + 2}];
+
    xlsx.utils.book_append_sheet(workbook, worksheet, 'Categories');
 
-   const excelFileName = 'speedrun_data.xlsx';
+   const desiredFileName = 'speedrun_data.xlsx'
+
+   let excelFileName = desiredFileName;
+   let counter = 1;
+
+   while (fs.existsSync(excelFileName)) {
+      const fileExtension = path.extname(desiredFileName);
+      const fileName = path.basename(desiredFileName, fileExtension);
+      const newFileName = `${fileName}_${counter}${fileExtension}`;
+      excelFileName = path.join(path.dirname(desiredFileName), newFileName);
+      counter++
+   }
+
    xlsx.writeFile(workbook, excelFileName);
 
    console.log(chalk.green(`Data saved in ${excelFileName}`));

@@ -4,7 +4,7 @@
   "description": "",
   "main": "HI_MADDIE_I_LOVE_YOU.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "node src/test.js",
     "start": "node src/index.js"
   },
   "keywords": [],
@@ -14,7 +14,8 @@
     "chalk": "^5.3.0",
     "clear": "^0.1.0",
     "puppeteer": "^20.7.4",
-    "xlsx": "^0.18.5"
+    "xlsx": "^0.18.5",
+    "xlsx-populate": "^1.21.0"
   },
   "type": "module"
 }
