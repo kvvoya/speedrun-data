@@ -110,7 +110,7 @@ async function createCategoryObject(page, link) {
    const category = new Category(cleanedTitle, runs, wrTime, link);
    console.log(chalk.magenta(`Created an object. Link: ${link}. Runs: ${runs}. WR Time: ${wrTime}`))
 
-   return runs > 0 ? category : null;
+   return category;
 }
 
 const cleanTitle = (title) => {
@@ -141,7 +141,7 @@ function addLevelToPath(link) {
 }
 
 export async function scrapeWebsite(link) {
-
+   
    const browserOptions = {
       headless: 'old'
    };
@@ -153,6 +153,7 @@ export async function scrapeWebsite(link) {
       return;
    }
 
+   categoriesOutput.length = 0; // clear an array
    const page = await browser.newPage();
 
    await page.goto(link);
