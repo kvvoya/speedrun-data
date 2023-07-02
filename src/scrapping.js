@@ -44,25 +44,26 @@ async function scrapeCategoryLinks(page, link, oldLinks = [], isLevelCategory = 
          filteredCategoryLinks = filteredCategoryLinks.concat(filteredLinks);
       }
 
-      for (const filteredLink of filteredCategoryLinks) {
-         const categoryLinks = await scrapeCategoryLinks(page, filteredLink, [...oldLinks, ...filteredCategoryLinks], isLevelCategory);
-         filteredCategoryLinks = filteredCategoryLinks.concat(categoryLinks);
-      }
-
-      await page.goto(link);
+      
+      // await page.goto(link);
    } else {
       const categoryLinks = await page.$$eval('a', elements => elements.map(el => el.href));
-
+      
       filteredCategoryLinks = categoryLinks.filter(link => 
          link.includes('?h=') &&
          !link.includes('&page=') && 
          !link.includes('&rules=') && 
-         !link.includes('#')
-      );
+         !link.includes('#') &&
+         !oldLinks.includes(link)
+         );
+      }
+      
+   for (const filteredLink of filteredCategoryLinks) {
+      const categoryLinks = await scrapeCategoryLinks(page, filteredLink, [...oldLinks, ...filteredCategoryLinks], isLevelCategory);
+      filteredCategoryLinks = filteredCategoryLinks.concat(categoryLinks);
    }
-
    const filteredCategoryLinksSet = new Set(filteredCategoryLinks);
-
+   await page.goto(link);
 
    console.log(chalk.cyan(`Went into ${link}`));
 
@@ -205,9 +206,8 @@ export async function scrapeWebsite(link) {
       }
    }
 
-   const categoryLinksArray = Array.from(categoryLinksSet);
-   console.log('Category links:', categoryLinksArray);
-   console.log(chalk.black.bgGreen(`Found ${categoryLinksArray.length} categories.`));
+   // const categoryLinksArray = Array.from(categoryLinksSet);
+   console.log(chalk.black.bgGreen(`Found ${categoriesOutput.length} categories.`));
 
    await browser.close();
 
