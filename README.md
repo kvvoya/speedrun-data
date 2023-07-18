@@ -23,4 +23,4 @@ Speedrun Data creates an Excel spreadsheet with all categories of a specified ga
 
 the code is messy and stuff and i made it for myself really so if there is something you find unconvinient in this program, i'm sorry. not like anyone needs it though
 
-![kvvoya](https://cdn.discordapp.com/attachments/1109333014196006955/1130879127453450281/Untitled-1.png){:height="200px" width="auto"}
+![kvvoya](https://cdn.discordapp.com/attachments/1109333014196006955/1130879987067658270/Untitled-1.png)
