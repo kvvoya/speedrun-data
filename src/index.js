@@ -5,7 +5,7 @@ import { scrapeWebsite } from './scrapping.js';
 
 function displayWelcomeMessage() {
    clear();
-   console.log(chalk.yellow.bold('Speedrun Data v1.0.3'));
+   console.log(chalk.yellow.bold('Speedrun Data v1.1.0'));
    console.log(chalk.green('by kvvoya'));
 }
 

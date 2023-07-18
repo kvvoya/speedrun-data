@@ -5,9 +5,8 @@ import fs from 'fs';
 import path from 'path';
 
 class Category {
-   constructor(title, runs, wrTime, link) {
+   constructor(link, runs, wrTime) {
       this.link = link;
-      this.title = title;
       this.runs = runs;
       this.wrTime = wrTime;
    }
@@ -17,52 +16,54 @@ const validUrlRegex = /^(ftp|http|https):\/\/[^ "]+$/;
 const categoriesOutput = [];
 const processedLinks = [];
 
-async function scrapeCategoryLinks(page, link, oldLinks = [], isLevelCategory = false) {
+async function scrapeCategoryLinks(page, link, oldLinks = []) {
    if (processedLinks.includes(link)) return;
-
-   if (isLevelCategory) {
-      link = addLevelToPath(link);
-   }
 
    await page.goto(link);
 
    let filteredCategoryLinks = [];
 
-   const dropdownElements = await page.$$('.py-1.px-2.text-sm.border.border-solid.border-divider.rounded-lg.cursor-pointer.transition-all.duration-200');
+   const rawDropdownElements = await page.$$('.x-input-dropdown-button');
+   const dropdownElements = rawDropdownElements.slice(2, -1);
 
-   if (dropdownElements.length > 0) {
+   if (dropdownElements && dropdownElements.length > 0) {
+      console.log('true');
       for (const dropdownElement of dropdownElements) {
          await dropdownElement.click();
          // await page.waitForNavigation();
 
          const links = await page.$$eval('a', elements => elements.map(el => el.href));
-         const filteredLinks = links.filter(link => 
+         const filteredLinks = links.filter(link =>
             link.includes('?h=') &&
-            !link.includes('&page=') && 
-            !link.includes('&rules=') && 
+            !link.includes('&page=') &&
+            !link.includes('&rules=') &&
             !link.includes('#') &&
+            !link.includes('/runs/new') &&
             !oldLinks.includes(link)
          );
+         console.log('filtered links:', filteredLinks);
 
          filteredCategoryLinks = filteredCategoryLinks.concat(filteredLinks);
       }
 
-      
+
       // await page.goto(link);
    } else {
+      console.log('false');
       const categoryLinks = await page.$$eval('a', elements => elements.map(el => el.href));
-      
-      filteredCategoryLinks = categoryLinks.filter(link => 
+
+      filteredCategoryLinks = categoryLinks.filter(link =>
          link.includes('?h=') &&
-         !link.includes('&page=') && 
-         !link.includes('&rules=') && 
+         !link.includes('&page=') &&
+         !link.includes('&rules=') &&
          !link.includes('#') &&
+         !link.includes('/runs/new') &&
          !oldLinks.includes(link)
-         );
-      }
-      
+      );
+   }
+
    for (const filteredLink of filteredCategoryLinks) {
-      const categoryLinks = await scrapeCategoryLinks(page, filteredLink, [...oldLinks, ...filteredCategoryLinks], isLevelCategory);
+      const categoryLinks = await scrapeCategoryLinks(page, filteredLink, [...oldLinks, ...filteredCategoryLinks]);
       filteredCategoryLinks = filteredCategoryLinks.concat(categoryLinks);
    }
    const filteredCategoryLinksSet = new Set(filteredCategoryLinks);
@@ -80,22 +81,19 @@ async function scrapeCategoryLinks(page, link, oldLinks = [], isLevelCategory = 
 async function createCategoryObject(page, link) {
 
    await page.waitForTimeout(100);
-   const pageTitle = await page.title();
+   const cleanedTitle = ''; // temporary
 
-   const cleanedTitle = cleanTitle(pageTitle);
-   console.log('Page title:', cleanedTitle);
-
-   const runsElement = await page.$('div.flex.px-4.py-3 .text-sm.text-on-panel');
-   const runsAmount = await page.$$eval('a .inline-flex.flex-nowrap.justify-start.items-end.gap-1', elements => elements.length);
-   const wrTimeElement = await page.$('#game-leaderboard tbody tr td:nth-child(3) a span');
+   const runsElement = await page.$('div.flex.flex-row.flex-wrap.px-5.py-2 .text-sm');
+   const runsAmount = await page.$$eval('tr.cursor-pointer', elements => elements.length);
+   const wrTimeElement = await page.$('tbody tr td:nth-child(4) a span span span span');
 
    let runs = 0;
    let wrTime = 0;
 
-   if (runsElement && runsAmount === 200) {
+   if (runsElement && runsAmount === 100) {
       const runsText = await page.evaluate(element => element.textContent, runsElement);
       console.log('Runs text:', runsText);
-      const runsMatch = runsText.match(/(\d+)\s*runs/);
+      const runsMatch = runsText.match(/(\d+)\s*Runs/);
       runs = runsMatch ? parseInt(runsMatch[1], 10) : 0;
    } else if (runsAmount) {
       runs = runsAmount ? parseInt(runsAmount, 10) : 0;
@@ -112,41 +110,14 @@ async function createCategoryObject(page, link) {
       wrTime = wrHours * 3600000 + wrMinutes * 60000 + wrSeconds * 1000 + wrMiliseconds;
    }
 
-   const category = new Category(cleanedTitle, runs, wrTime, link);
+   const category = new Category(link, runs, wrTime);
    console.log(chalk.magenta(`Created an object. Link: ${link}. Runs: ${runs}. WR Time: ${wrTime}`))
 
    return category;
 }
 
-const cleanTitle = (title) => {
-   const gameNameIndex = title.lastIndexOf(' - ');
-   if (gameNameIndex !== -1) {
-      return title.substring(0, gameNameIndex).trim();
-   }
-   return title;
-}
-
-function filterToLevelLinks(links) {
-   const filteredLevelLinks = Array.from(new Set(links.filter(link => link.includes('/level/'))));
-   return filteredLevelLinks;
-}
-
-function addLevelToPath(link) {
-   const url = new URL(link);
-   
-   if (url.pathname.includes('/level/')) {
-      return link;
-   }
-
-   const segments = url.pathname.split('/');
-   segments.splice(segments.length - 1, 0, 'level');
-
-   url.pathname = segments.join('/');
-   return url.href;
-}
-
 export async function scrapeWebsite(link) {
-   
+
    const browserOptions = {
       headless: 'old'
    };
@@ -163,21 +134,29 @@ export async function scrapeWebsite(link) {
 
    await page.goto(link);
 
-   const leaderboardElement = await page.$('#leaderboard-dropdown');
-   if (!leaderboardElement) {
+   const leaderboardElement = await page.$$eval('button div.text-sm.font-medium', (divs) => {
+      return divs.map((div) => div.textContent);
+   });
+   if (leaderboardElement[0] !== 'Leaderboards') {
       console.log(chalk.red('INVALID LINK (MUST BE A GAME LEADERBOARD):', link));
       await browser.close();
       return;
    }
 
    const links = await page.$$eval('a', elements => elements.map(el => el.href));
-   const filteredLinks = Array.from(new Set(links.filter(link => 
+   const filteredLinks = Array.from(new Set(links.filter(link =>
       link.includes('?h') &&
-      !link.includes('&page=') && 
-      !link.includes('&rules=') && 
-      !link.includes('#')
+      !link.includes('&page=') &&
+      !link.includes('&rules=') &&
+      !link.includes('#') &&
+      !link.includes('/runs/new')
    )));
-   const levelLinks = filterToLevelLinks(links);
+   // const levelLinks = filterToLevelLinks(links);
+   const dropdownElements = await page.$$('.x-input-dropdown-button[id]');
+   await dropdownElements[1].click();
+   const refetchedLinks = await page.$$eval('a', elements => elements.map(el => el.href));
+
+   const levelLinks = refetchedLinks.filter(link => !links.includes(link));
 
    const categoryLinksSet = new Set();
 
@@ -188,24 +167,25 @@ export async function scrapeWebsite(link) {
       categoryLinks.forEach(categoryLink => categoryLinksSet.add(categoryLink));
    }
 
-   
+
    console.log('------------');
    console.log(chalk.greenBright('Going through ILs....'));
-   
+
 
    for (const ilLink of levelLinks) {
       await page.goto(ilLink);
 
       const links = await page.$$eval('a', elements => elements.map(el => el.href));
-      const filteredLinks = Array.from(new Set(links.filter(link => 
+      const filteredLinks = Array.from(new Set(links.filter(link =>
          link.includes('?h') &&
-         !link.includes('&page=') && 
-         !link.includes('&rules=') && 
-         !link.includes('#')
+         !link.includes('&page=') &&
+         !link.includes('&rules=') &&
+         !link.includes('#') &&
+         !link.includes('/runs/new')
       )));
 
       for (const filteredLink of filteredLinks) {
-         const categoryLinks = await scrapeCategoryLinks(page, filteredLink, filteredLinks, true);
+         const categoryLinks = await scrapeCategoryLinks(page, filteredLink, filteredLinks);
          categoryLinks.forEach(categoryLink => categoryLinksSet.add(categoryLink));
       }
    }
@@ -222,19 +202,19 @@ function createExcelSpreadsheet() {
    const workbook = xlsx.utils.book_new();
    const worksheet = xlsx.utils.json_to_sheet([]);
 
-   const headers = ['Category', 'Runs', 'WR Time', 'Link'];
+   const headers = ['Category', 'Runs', 'WR Time'];
 
    xlsx.utils.sheet_add_aoa(worksheet, [headers], { origin: 'A1' });
 
    const categoriesData = categoriesOutput
       .filter((category) => category !== null)
-      .map((category) => [category.title, category.runs, category.wrTime, category.link]);
+      .map((category) => [category.link, category.runs, category.wrTime]);
 
-   xlsx.utils.sheet_add_aoa(worksheet, categoriesData, { origin: 'A2'});
+   xlsx.utils.sheet_add_aoa(worksheet, categoriesData, { origin: 'A2' });
 
    const columnTitleLen = categoriesData.map(row => row[0].length);
    const maxTitleLen = Math.max(...columnTitleLen);
-   worksheet['!cols'] = [{width: maxTitleLen + 2}];
+   worksheet['!cols'] = [{ width: maxTitleLen + 2 }];
 
    xlsx.utils.book_append_sheet(workbook, worksheet, 'Categories');
 
