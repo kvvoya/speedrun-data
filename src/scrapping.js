@@ -27,7 +27,6 @@ async function scrapeCategoryLinks(page, link, oldLinks = []) {
    const dropdownElements = rawDropdownElements.slice(2, -1);
 
    if (dropdownElements && dropdownElements.length > 0) {
-      console.log('true');
       for (const dropdownElement of dropdownElements) {
          await dropdownElement.click();
          // await page.waitForNavigation();
@@ -41,7 +40,6 @@ async function scrapeCategoryLinks(page, link, oldLinks = []) {
             !link.includes('/runs/new') &&
             !oldLinks.includes(link)
          );
-         console.log('filtered links:', filteredLinks);
 
          filteredCategoryLinks = filteredCategoryLinks.concat(filteredLinks);
       }
@@ -49,7 +47,6 @@ async function scrapeCategoryLinks(page, link, oldLinks = []) {
 
       // await page.goto(link);
    } else {
-      console.log('false');
       const categoryLinks = await page.$$eval('a', elements => elements.map(el => el.href));
 
       filteredCategoryLinks = categoryLinks.filter(link =>
@@ -92,7 +89,6 @@ async function createCategoryObject(page, link) {
 
    if (runsElement && runsAmount === 100) {
       const runsText = await page.evaluate(element => element.textContent, runsElement);
-      console.log('Runs text:', runsText);
       const runsMatch = runsText.match(/(\d+)\s*Runs/);
       runs = runsMatch ? parseInt(runsMatch[1], 10) : 0;
    } else if (runsAmount) {
@@ -101,7 +97,7 @@ async function createCategoryObject(page, link) {
 
    if (wrTimeElement) {
       const wrTimeText = await page.evaluate(element => element.textContent, wrTimeElement);
-      console.log('WR text:', wrTimeText);
+      console.log('WR time:', wrTimeText);
       const wrTimeMatch = wrTimeText.match(/(?:(\d+)\s*h)?\s*(?:(\d+)\s*m)?\s*(?:(\d+)\s*s)?\s*(?:(\d+)\s*ms)?/);
       const wrHours = wrTimeMatch ? parseInt(wrTimeMatch[1], 10) || 0 : 0;
       const wrMinutes = wrTimeMatch ? parseInt(wrTimeMatch[2], 10) || 0 : 0;
@@ -218,16 +214,22 @@ function createExcelSpreadsheet() {
 
    xlsx.utils.book_append_sheet(workbook, worksheet, 'Categories');
 
-   const desiredFileName = 'speedrun_data.xlsx'
+   const outputFolder = 'output';
+   if (!fs.existsSync(outputFolder)) {
+      fs.mkdirSync(outputFolder);
+   }
 
-   let excelFileName = desiredFileName;
+   const desiredFileName = 'speedrun_data.xlsx';
+   const outputPath = path.join(outputFolder, desiredFileName);
+
+   let excelFileName = outputPath;
    let counter = 1;
 
    while (fs.existsSync(excelFileName)) {
       const fileExtension = path.extname(desiredFileName);
       const fileName = path.basename(desiredFileName, fileExtension);
       const newFileName = `${fileName}_${counter}${fileExtension}`;
-      excelFileName = path.join(path.dirname(desiredFileName), newFileName);
+      excelFileName = path.join(outputFolder, newFileName);
       counter++
    }
 

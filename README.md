@@ -1,12 +1,10 @@
-# DUE TO THE NEW WEBSITE UI, THIS PROGRAM DOES NOT WORK!
-
 # Speedrun Data
 
-![Version](https://img.shields.io/badge/version-1.0.3-8A2BE2)
+![Version](https://img.shields.io/badge/version-1.1.0-8A2BE2)
 
 ## About
 
-Speedrun Data is a Node.js app that can web-scrap any webpage from [speedrun.com](https://speedrun.com) to display various information about the game's leaderboard.
+Speedrun Data is a Node.js app that can web-scrape any webpage from [speedrun.com](https://speedrun.com) to display various information about the game's leaderboard.
 
 ## What it can do
 
