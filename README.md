@@ -24,4 +24,9 @@ Speedrun Data is a Node.js application that can utilizes web scraping to extract
 
 > **Note:** The code may not be optimized and was primarily developed for personal use. If you encounter any inconveniences while using the program, I apologize in advance.
 
-![kvvoya](https://cdn.discordapp.com/attachments/1109333014196006955/1130879987067658270/Untitled-1.png)
+## License
+
+This project is licensed under the Creative Commons Attribution-NonCommercial 4.0 International License - see the [LICENSE.md](LICENSE.md) file for details.
+
+###### by kvvoya
+
