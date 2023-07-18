@@ -14,7 +14,7 @@ Speedrun Data creates an Excel spreadsheet with all categories of a specified ga
 
 1. Install [Node.js](https://nodejs.org)
 2. Download the program in releases page
-3. Open command line in program's directory and type `npm install`
+3. Open command line in program's directory and type `npm install` or run `setup.bat`
 4. Run `run.bat` file or run `npm start` in the directory of a program
 5. Enter a valid speedrun.com leaderboard link. It's best to remove all unnecessary things and enter it like this: `https://speedrun.com/game_name` where _game_name_ is the name of the game in URL
 6. After it went through everything, you can exit the program by typing `exit`
