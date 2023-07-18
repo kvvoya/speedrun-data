@@ -2,25 +2,26 @@
 
 ![Version](https://img.shields.io/badge/version-1.1.0-8A2BE2)
 
-## About
+## Overview
 
-Speedrun Data is a Node.js app that can web-scrape any webpage from [speedrun.com](https://speedrun.com) to display various information about the game's leaderboard.
+Speedrun Data is a Node.js application that can utilizes web scraping to extract information from [speedrun.com](https://speedrun.com) and generate an Excel spreadsheet with leaderboard data for a specific game.
 
-## What it can do
+## Features
 
-Speedrun Data creates an Excel spreadsheet with all categories of a specified game with the **amount of runs** and **world record time (in ms)**
+- Web scrapes speedrun.com to gather leaderboard information
+- Generates an Excel spreadsheet with categories, run counts, and world record times (in milliseconds)
+- Simple installation and usage process
 
-## How to install and use
+## Installation and Usage
 
 1. Install [Node.js](https://nodejs.org)
-2. Download the program in releases page
-3. Open command line in program's directory and type `npm install` or run `setup.bat`
-4. Run `run.bat` file or run `npm start` in the directory of a program
-5. Enter a valid speedrun.com leaderboard link. It's best to remove all unnecessary things and enter it like this: `https://speedrun.com/game_name` where _game_name_ is the name of the game in URL
-6. After it went through everything, you can exit the program by typing `exit`
+2. Download the program from the releases page
+3. Open the command line in the program's directory and run `npm install` or execute `setup.bat`
+4. Run the program using `run.bat` or execute `npm start` in the program's directory
+5. Enter a valid speedrun.com leaderboard link. Use the following format:
+`https://speedrun.com/game_name`, where _game_name_ represents the name of the game in the URL
+6. Once the program has completed scraping and generating the spreadsheet, you can exit by typing `exit`
 
-### P. S.
-
-the code is messy and stuff and i made it for myself really so if there is something you find unconvinient in this program, i'm sorry. not like anyone needs it though
+> **Note:** The code may not be optimized and was primarily developed for personal use. If you encounter any inconveniences while using the program, I apologize in advance.
 
 ![kvvoya](https://cdn.discordapp.com/attachments/1109333014196006955/1130879987067658270/Untitled-1.png)
