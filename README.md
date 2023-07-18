@@ -1,3 +1,5 @@
+# DUE TO THE NEW UI, THIS PROGRAM DOES NOT WORK!
+
 # Speedrun Data
 
 ![Version](https://img.shields.io/badge/version-1.0.3-8A2BE2)
