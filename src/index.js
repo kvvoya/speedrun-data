@@ -20,7 +20,7 @@ o888o o888o     \`8'         \`8'     \`Y8bod8P'     .8'     \`Y888""8o
 function displayWelcomeMessage() {
    clear();
    console.log(chalk.magentaBright(kvvoyaAscii));
-   console.log(chalk.yellow.bold('Speedrun Data v1.1.0'));
+   console.log(chalk.yellow.bold('Speedrun Data v1.1.0.1'));
 }
 
 const r1 = readline.createInterface({
