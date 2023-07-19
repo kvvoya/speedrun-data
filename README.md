@@ -4,7 +4,7 @@
 
 ## Overview
 
-Speedrun Data is a Node.js application that can utilizes web scraping to extract information from [speedrun.com](https://speedrun.com) and generate an Excel spreadsheet with leaderboard data for a specific game.
+Speedrun Data is a Node.js application that utilizes web scraping to extract information from [speedrun.com](https://speedrun.com) and generate an Excel spreadsheet with leaderboard data for a specific game.
 
 ## Features
 
@@ -26,7 +26,7 @@ Speedrun Data is a Node.js application that can utilizes web scraping to extract
 
 ## License
 
-This project is licensed under the Creative Commons Attribution-NonCommercial 4.0 International License - see the [LICENSE.md](LICENSE.md) file for details.
+This project is licensed under the MIT license - see the [LICENSE.md](LICENSE.md) file for details.
 
 ###### by kvvoya
 
