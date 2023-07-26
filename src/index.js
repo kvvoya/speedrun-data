@@ -20,7 +20,7 @@ o888o o888o     \`8'         \`8'     \`Y8bod8P'     .8'     \`Y888""8o
 function displayWelcomeMessage() {
    clear();
    console.log(chalk.magentaBright(kvvoyaAscii));
-   console.log(chalk.yellow.bold('Speedrun Data v1.1.0.1'));
+   console.log(chalk.yellow.bold('Speedrun Data v1.2.0'));
 }
 
 const r1 = readline.createInterface({
@@ -29,23 +29,20 @@ const r1 = readline.createInterface({
 });
 
 
-displayWelcomeMessage();
+async function main() {
+   displayWelcomeMessage();
 
-while (true) {
-   const link = await askQuestion('Enter a speedrun.com link to scrape: ');
-   if (link.toLowerCase() === 'exit') {
-      break;
+   while (true) {
+      const link = await askQuestion('Enter a speedrun.com link to scrape: ');
+      if (link.toLowerCase() === 'exit') {
+         break;
+      }
+
+      await scrapeWebsite(link);
    }
 
-   await scrapeWebsite(link);
+   r1.close();
 }
-
-r1.close();
-
-// r1.question('Enter a speedrun.com link to scrape: ', async (link) => {
-//    await scrapeWebsite(link);
-//    r1.close();
-// })
 
 function askQuestion(q) {
    return new Promise((resolve) => {
@@ -54,3 +51,5 @@ function askQuestion(q) {
       });
    });
 }
+
+main();

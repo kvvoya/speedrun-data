@@ -150,6 +150,12 @@ export async function scrapeWebsite(link) {
    // const levelLinks = filterToLevelLinks(links);
    const dropdownElements = await page.$$('.x-input-dropdown-button[id]');
    await dropdownElements[1].click();
+
+   await page.evaluate(() => {
+      const dropdownOptionsElement = document.querySelector('.x-input-dropdown-options.x-custom-scrollbar');
+      dropdownOptionsElement.removeAttribute('style');
+   });
+
    const refetchedLinks = await page.$$eval('a', elements => elements.map(el => el.href));
 
    const levelLinks = refetchedLinks.filter(link => !links.includes(link));

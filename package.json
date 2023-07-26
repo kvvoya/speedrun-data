@@ -1,11 +1,12 @@
 {
    "name": "speedrun-data",
-   "version": "1.1.0.1",
+   "version": "1.2.0",
    "description": "Speedrun.com scrapper that shows some interesting information about games you want to analyze.",
    "main": "src/index.js",
    "scripts": {
       "test": "node src/test.js",
-      "start": "node src/index.js"
+      "start": "node src/index.js",
+      "build": "pkg ./src/index.js -t node18-win-x64"
    },
    "keywords": [],
    "author": "kvvoya",
@@ -16,5 +17,8 @@
       "puppeteer": "^20.7.4",
       "xlsx": "^0.18.5"
    },
-   "type": "module"
+   "type": "module",
+   "pkg": {
+      "scripts": "build/**/*.js"
+   }
 }
