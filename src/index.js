@@ -21,7 +21,7 @@ o888o o888o     \`8'         \`8'     \`Y8bod8P'     .8'     \`Y888""8o
 function displayWelcomeMessage() {
    clear();
    console.log(chalk.magentaBright(kvvoyaAscii));
-   console.log(chalk.yellow.bold('Speedrun Data v1.2.0'));
+   console.log(chalk.yellow.bold('Speedrun Data v1.2.1'));
 }
 
 const r1 = readline.createInterface({
@@ -41,35 +41,42 @@ async function readLinksFromFile(filename) {
 
 
 async function main() {
-   displayWelcomeMessage();
 
-   while (true) {
-      const link = await askQuestion('Enter a speedrun.com link to scrape: ');
-      if (link.toLowerCase() === 'exit') {
-         break;
-      }
+   try {
+      displayWelcomeMessage();
 
-      if (link.toLowerCase() === 'links') {
-         const linksFromFile = await readLinksFromFile('links.txt');
-         if (linksFromFile.length === 0) {
-            console.log(chalk.red('No links found in a file!'));
-            continue;
+      while (true) {
+         const link = await askQuestion('Enter a speedrun.com link to scrape (or enter special commands like "links" or "exit"): ');
+         if (link.toLowerCase() === 'exit') {
+            break;
          }
 
-         const mergeStats = (await askQuestion('Do you want to MERGE all stats into a single Excel spreadsheet? (y/n): ')).toLowerCase() === 'y';
-
-         if (mergeStats) {
-            await mergeStatsLogic(linksFromFile);
-         } else {
-            for (const link of linksFromFile) {
-               await scrapeWebsite(link);
+         if (link.toLowerCase() === 'links') {
+            const linksFromFile = await readLinksFromFile('links.txt');
+            if (linksFromFile.length === 0) {
+               console.log(chalk.red('No links found in a file!'));
+               continue;
             }
+
+            const mergeStats = (await askQuestion('Do you want to MERGE all stats into a single Excel spreadsheet? (y/n): ')).toLowerCase() === 'y';
+
+            if (mergeStats) {
+               await mergeStatsLogic(linksFromFile);
+            } else {
+               for (const link of linksFromFile) {
+                  await scrapeWebsite(link);
+               }
+            }
+         } else {
+            await scrapeWebsite(link);
          }
-      } else {
-         await scrapeWebsite(link);
       }
+      r1.close();
+   } catch (error) {
+      console.error(chalk.red('An error has occured ->', error.message));
+      r1.close();
    }
-   r1.close();
+
 }
 
 async function mergeStatsLogic(links) {

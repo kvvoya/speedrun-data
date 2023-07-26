@@ -24,7 +24,7 @@ async function scrapeCategoryLinks(page, link, oldLinks = []) {
    let filteredCategoryLinks = [];
 
    const rawDropdownElements = await page.$$('.x-input-dropdown-button');
-   const dropdownElements = rawDropdownElements.slice(2, -1);
+   const dropdownElements = rawDropdownElements.slice(1, -1);
 
    if (dropdownElements && dropdownElements.length > 0) {
       for (const dropdownElement of dropdownElements) {
@@ -133,21 +133,20 @@ export async function scrapeWebsite(link) {
    const leaderboardElement = await page.$$eval('button div.text-sm.font-medium', (divs) => {
       return divs.map((div) => div.textContent);
    });
-   if (leaderboardElement[0] !== 'Leaderboards') {
+   if (leaderboardElement[0] !== 'Leaderboards' && leaderboardElement[0] !== 'Levels') {
       console.log(chalk.red('INVALID LINK (MUST BE A GAME LEADERBOARD):', link));
       await browser.close();
       return;
    }
 
    const links = await page.$$eval('a', elements => elements.map(el => el.href));
-   const filteredLinks = Array.from(new Set(links.filter(link =>
+   const fullLinks = Array.from(new Set(links.filter(link =>
       link.includes('?h') &&
       !link.includes('&page=') &&
       !link.includes('&rules=') &&
       !link.includes('#') &&
       !link.includes('/runs/new')
    )));
-   // const levelLinks = filterToLevelLinks(links);
    const dropdownElements = await page.$$('.x-input-dropdown-button[id]');
    await dropdownElements[1].click();
 
@@ -160,36 +159,15 @@ export async function scrapeWebsite(link) {
 
    const levelLinks = refetchedLinks.filter(link => !links.includes(link));
 
+   const filteredLinks = [...fullLinks, ...levelLinks];
+
    const categoryLinksSet = new Set();
 
-   console.log(chalk.greenBright('Going through full-game categories....'));
+   console.log(chalk.greenBright('Going through categories....'));
 
    for (const filteredLink of filteredLinks) {
       const categoryLinks = await scrapeCategoryLinks(page, filteredLink, filteredLinks);
       categoryLinks.forEach(categoryLink => categoryLinksSet.add(categoryLink));
-   }
-
-
-   console.log('------------');
-   console.log(chalk.greenBright('Going through ILs....'));
-
-
-   for (const ilLink of levelLinks) {
-      await page.goto(ilLink);
-
-      const links = await page.$$eval('a', elements => elements.map(el => el.href));
-      const filteredLinks = Array.from(new Set(links.filter(link =>
-         link.includes('?h') &&
-         !link.includes('&page=') &&
-         !link.includes('&rules=') &&
-         !link.includes('#') &&
-         !link.includes('/runs/new')
-      )));
-
-      for (const filteredLink of filteredLinks) {
-         const categoryLinks = await scrapeCategoryLinks(page, filteredLink, filteredLinks);
-         categoryLinks.forEach(categoryLink => categoryLinksSet.add(categoryLink));
-      }
    }
 
    // const categoryLinksArray = Array.from(categoryLinksSet);

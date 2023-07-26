@@ -1,6 +1,6 @@
 # Speedrun Data
 
-![Version](https://img.shields.io/badge/version-1.2.0-8A2BE2)
+![v1.2.1](https://img.shields.io/badge/version-1.2.1-8A2BE2)
 
 ## Overview
 
