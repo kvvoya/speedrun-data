@@ -1,7 +1,8 @@
 import readline from 'readline';
 import chalk from 'chalk';
 import clear from 'clear';
-import { scrapeWebsite } from './scrapping.js';
+import fs from 'fs';
+import { scrapeWebsite, createExcelSpreadsheet } from './scrapping.js';
 
 const kvvoyaAscii = `
 
@@ -28,6 +29,16 @@ const r1 = readline.createInterface({
    output: process.stdout
 });
 
+async function readLinksFromFile(filename) {
+   try {
+      const data = await fs.promises.readFile(filename, 'utf8');
+      return data.split('\n').map(link => link.trim()).filter(link => link.length > 0);
+   } catch (err) {
+      console.error(chalk.red('Error reading the links.txt file ->', err.message));
+      return [];
+   }
+}
+
 
 async function main() {
    displayWelcomeMessage();
@@ -38,10 +49,38 @@ async function main() {
          break;
       }
 
-      await scrapeWebsite(link);
+      if (link.toLowerCase() === 'links') {
+         const linksFromFile = await readLinksFromFile('links.txt');
+         if (linksFromFile.length === 0) {
+            console.log(chalk.red('No links found in a file!'));
+            continue;
+         }
+
+         const mergeStats = (await askQuestion('Do you want to MERGE all stats into a single Excel spreadsheet? (y/n): ')).toLowerCase() === 'y';
+
+         if (mergeStats) {
+            await mergeStatsLogic(linksFromFile);
+         } else {
+            for (const link of linksFromFile) {
+               await scrapeWebsite(link);
+            }
+         }
+      } else {
+         await scrapeWebsite(link);
+      }
+   }
+   r1.close();
+}
+
+async function mergeStatsLogic(links) {
+   const allCategoriesOutput = [];
+
+   for (const link of links) {
+      const categoriesOutput = await scrapeWebsite(link);
+      allCategoriesOutput.push(...categoriesOutput);
    }
 
-   r1.close();
+   createExcelSpreadsheet(allCategoriesOutput, true);
 }
 
 function askQuestion(q) {

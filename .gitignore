@@ -3,3 +3,4 @@ node_modules/
 *.xlsx
 *.bat
 output/
+links.txt

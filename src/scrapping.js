@@ -197,10 +197,12 @@ export async function scrapeWebsite(link) {
 
    await browser.close();
 
-   createExcelSpreadsheet();
+   createExcelSpreadsheet(categoriesOutput);
+
+   return categoriesOutput;
 }
 
-function createExcelSpreadsheet() {
+export function createExcelSpreadsheet(categoriesOutput, merge = false) {
    const workbook = xlsx.utils.book_new();
    const worksheet = xlsx.utils.json_to_sheet([]);
 
@@ -225,7 +227,7 @@ function createExcelSpreadsheet() {
       fs.mkdirSync(outputFolder);
    }
 
-   const desiredFileName = 'speedrun_data.xlsx';
+   const desiredFileName = merge ? 'MERGE.xlsx' : 'speedrun_data.xlsx';
    const outputPath = path.join(outputFolder, desiredFileName);
 
    let excelFileName = outputPath;
@@ -236,10 +238,14 @@ function createExcelSpreadsheet() {
       const fileName = path.basename(desiredFileName, fileExtension);
       const newFileName = `${fileName}_${counter}${fileExtension}`;
       excelFileName = path.join(outputFolder, newFileName);
-      counter++
+      counter++;
    }
 
    xlsx.writeFile(workbook, excelFileName);
 
-   console.log(chalk.green(`Data saved in ${excelFileName}`));
+   if (!merge) {
+      console.log(chalk.green(`Data saved in ${excelFileName}`));
+   } else {
+      console.log(chalk.green(`All MERGED data saved in ${excelFileName}`));
+   }
 }
