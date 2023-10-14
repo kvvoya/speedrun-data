@@ -73,7 +73,7 @@ async function main() {
       }
       r1.close();
    } catch (error) {
-      console.error(chalk.red('An error has occured ->', error.message));
+      console.error(chalk.red('An error has occured ->', error));
       r1.close();
    }
 

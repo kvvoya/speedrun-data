@@ -28,7 +28,7 @@ async function scrapeCategoryLinks(page, link, oldLinks = []) {
 
    if (dropdownElements && dropdownElements.length > 0) {
       for (const dropdownElement of dropdownElements) {
-         await dropdownElement.click();
+         await dropdownElement.evaluate(b => b.click());
          // await page.waitForNavigation();
 
          const links = await page.$$eval('a', elements => elements.map(el => el.href));
@@ -78,8 +78,6 @@ async function scrapeCategoryLinks(page, link, oldLinks = []) {
 async function createCategoryObject(page, link) {
 
    await page.waitForTimeout(100);
-   const cleanedTitle = ''; // temporary
-
    const runsElement = await page.$('div.flex.flex-row.flex-wrap.px-5.py-2 .text-sm');
    const runsAmount = await page.$$eval('tr.cursor-pointer', elements => elements.length);
    const wrTimeElement = await page.$('tbody tr td:nth-child(4) a span span span span');
@@ -115,7 +113,8 @@ async function createCategoryObject(page, link) {
 export async function scrapeWebsite(link) {
 
    const browserOptions = {
-      headless: 'old'
+      headless: 'new',
+      ignoreHTTPSErrors: true
    };
    const browser = await puppeteer.launch(browserOptions);
 
@@ -128,6 +127,7 @@ export async function scrapeWebsite(link) {
    categoriesOutput.length = 0; processedLinks.length = 0; // clears arrays
    const page = await browser.newPage();
 
+   await page.setDefaultNavigationTimeout(0); // risks program to get "stuck" :(
    await page.goto(link);
 
    const leaderboardElement = await page.$$eval('button div.text-sm.font-medium', (divs) => {
@@ -148,7 +148,7 @@ export async function scrapeWebsite(link) {
       !link.includes('/runs/new')
    )));
    const dropdownElements = await page.$$('.x-input-dropdown-button[id]');
-   await dropdownElements[1].click();
+   await dropdownElements[1].evaluate(b => b.click());
 
    await page.evaluate(() => {
       const dropdownOptionsElement = document.querySelector('.x-input-dropdown-options.x-custom-scrollbar');
