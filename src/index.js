@@ -2,7 +2,7 @@ import readline from 'readline';
 import chalk from 'chalk';
 import clear from 'clear';
 import fs from 'fs';
-import { scrapeWebsite, createExcelSpreadsheet } from './scrapping.js';
+import { getCategories, createExcelSheet } from './scrapping.js';
 
 const kvvoyaAscii = `
 
@@ -21,7 +21,7 @@ o888o o888o     \`8'         \`8'     \`Y8bod8P'     .8'     \`Y888""8o
 function displayWelcomeMessage() {
    clear();
    console.log(chalk.magentaBright(kvvoyaAscii));
-   console.log(chalk.yellow.bold('Speedrun Data v1.2.1'));
+   console.log(chalk.yellow.bold('Speedrun Data v1.3.0'));
 }
 
 const r1 = readline.createInterface({
@@ -34,7 +34,7 @@ async function readLinksFromFile(filename) {
       const data = await fs.promises.readFile(filename, 'utf8');
       return data.split('\n').map(link => link.trim()).filter(link => link.length > 0);
    } catch (err) {
-      console.error(chalk.red('Error reading the links.txt file ->', err.message));
+      console.error(chalk.red('Error reading the games.txt file ->', err.message));
       return [];
    }
 }
@@ -46,15 +46,15 @@ async function main() {
       displayWelcomeMessage();
 
       while (true) {
-         const link = await askQuestion('Enter a speedrun.com link to scrape (or enter special commands like "links" or "exit"): ');
+         const link = await askQuestion('Enter a speedrun.com game to analyse (or enter special commands like "games" or "exit"): ');
          if (link.toLowerCase() === 'exit') {
             break;
          }
 
-         if (link.toLowerCase() === 'links') {
-            const linksFromFile = await readLinksFromFile('links.txt');
+         if (link.toLowerCase() === 'games') {
+            const linksFromFile = await readLinksFromFile('games.txt');
             if (linksFromFile.length === 0) {
-               console.log(chalk.red('No links found in a file!'));
+               console.log(chalk.red('No games found in a file!'));
                continue;
             }
 
@@ -64,11 +64,11 @@ async function main() {
                await mergeStatsLogic(linksFromFile);
             } else {
                for (const link of linksFromFile) {
-                  await scrapeWebsite(link);
+                  await getCategories(link);
                }
             }
          } else {
-            await scrapeWebsite(link);
+            await getCategories(link);
          }
       }
       r1.close();
@@ -83,11 +83,11 @@ async function mergeStatsLogic(links) {
    const allCategoriesOutput = [];
 
    for (const link of links) {
-      const categoriesOutput = await scrapeWebsite(link);
+      const categoriesOutput = await getCategories(link);
       allCategoriesOutput.push(...categoriesOutput);
    }
 
-   createExcelSpreadsheet(allCategoriesOutput, true);
+   createExcelSheet(allCategoriesOutput, true);
 }
 
 function askQuestion(q) {

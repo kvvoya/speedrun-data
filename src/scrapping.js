@@ -1,204 +1,226 @@
-import puppeteer from 'puppeteer';
 import chalk from 'chalk';
-import xlsx from 'xlsx';
 import fs from 'fs';
 import path from 'path';
+import axios from "axios";
+import excel from 'excel4node';
+
+const apiUrl = 'https://speedrun.com/api/v1';
+
+const apiOptions = {
+   headers: {
+      'User-Agent': 'speedrun-data/1.3.0'
+   },
+};
 
 class Category {
-   constructor(link, runs, wrTime) {
-      this.link = link;
+   constructor(categoryName, runs, wrTime, cost) {
+      this.categoryName = categoryName;
       this.runs = runs;
       this.wrTime = wrTime;
+      this.cost = cost;
+      // this.link = link;
    }
 }
 
-const validUrlRegex = /^(ftp|http|https):\/\/[^ "]+$/;
-const categoriesOutput = [];
-const processedLinks = [];
+function isEmpty(arr) {
+   return Array.isArray(arr) && (arr.length == 0 || arr.every(isEmpty));
+}
 
-async function scrapeCategoryLinks(page, link, oldLinks = []) {
-   if (processedLinks.includes(link)) return;
+export async function getCategories(gameName) {
+   try {
+      const categoryObjects = [];
 
-   await page.goto(link);
+      const gamesResponse = await axios.get(`${apiUrl}/games?name=${gameName}`, apiOptions);
+      const gamesData = gamesResponse.data.data;
 
-   let filteredCategoryLinks = [];
-
-   const rawDropdownElements = await page.$$('.x-input-dropdown-button');
-   const dropdownElements = rawDropdownElements.slice(1, -1);
-
-   if (dropdownElements && dropdownElements.length > 0) {
-      for (const dropdownElement of dropdownElements) {
-         await dropdownElement.evaluate(b => b.click());
-         // await page.waitForNavigation();
-
-         const links = await page.$$eval('a', elements => elements.map(el => el.href));
-         const filteredLinks = links.filter(link =>
-            link.includes('?h=') &&
-            !link.includes('&page=') &&
-            !link.includes('&rules=') &&
-            !link.includes('#') &&
-            !link.includes('/runs/new') &&
-            !oldLinks.includes(link)
-         );
-
-         filteredCategoryLinks = filteredCategoryLinks.concat(filteredLinks);
+      if (gamesData.length === 0) {
+         console.error(chalk.red(`There is no such game like ${gameName}`));
+         return;
       }
 
+      const officialGameName = gamesData[0].names.international;
 
-      // await page.goto(link);
-   } else {
-      const categoryLinks = await page.$$eval('a', elements => elements.map(el => el.href));
+      const gameID = gamesData[0].id;
+      console.log('gameID:', gameID)
 
-      filteredCategoryLinks = categoryLinks.filter(link =>
-         link.includes('?h=') &&
-         !link.includes('&page=') &&
-         !link.includes('&rules=') &&
-         !link.includes('#') &&
-         !link.includes('/runs/new') &&
-         !oldLinks.includes(link)
-      );
+      await processAnalysis(gameID, officialGameName, categoryObjects);
+
+      console.log(chalk.cyan('Full game runs analyzed! Going through ILs...'));
+
+      const levelsResponse = await axios.get(`${apiUrl}/games/${gameID}/levels`, apiOptions);
+      const levelsData = levelsResponse.data.data;
+
+      for (const level of levelsData) {
+         await processAnalysis(gameID, officialGameName, categoryObjects, { id: level.id, name: level.name });
+      }
+
+      console.log(chalk.cyan('Done! :)'));
+      createExcelSheet(categoryObjects);
+      return categoryObjects;
+
+   } catch (err) {
+      console.error('Error:', err);
    }
-
-   for (const filteredLink of filteredCategoryLinks) {
-      const categoryLinks = await scrapeCategoryLinks(page, filteredLink, [...oldLinks, ...filteredCategoryLinks]);
-      filteredCategoryLinks = filteredCategoryLinks.concat(categoryLinks);
-   }
-   const filteredCategoryLinksSet = new Set(filteredCategoryLinks);
-   await page.goto(link);
-
-   console.log(chalk.cyan(`Went into ${link}`));
-
-   const category = await createCategoryObject(page, link);
-   categoriesOutput.push(category);
-   processedLinks.push(link);
-
-   return Array.from(filteredCategoryLinksSet);
 }
 
-async function createCategoryObject(page, link) {
+async function processAnalysis(gameID, officialGameName, categoryObjects, level = null) {
+   const categoriesResponse = await axios.get(!level ? `${apiUrl}/games/${gameID}/categories` : `${apiUrl}/levels/${level.id}/categories`, apiOptions);
+   const categoriesResponseData = categoriesResponse.data.data;
 
-   await page.waitForTimeout(100);
-   const runsElement = await page.$('div.flex.flex-row.flex-wrap.px-5.py-2 .text-sm');
-   const runsAmount = await page.$$eval('tr.cursor-pointer', elements => elements.length);
-   const wrTimeElement = await page.$('tbody tr td:nth-child(4) a span span span span');
+   for (const category of categoriesResponseData) {
+      const toRequest = [];
 
-   let runs = 0;
-   let wrTime = 0;
+      if ((category.type === 'per-game' && !level) || (category.type === 'per-level' && level)) {
+         const recordsResponse = await axios.get(!level ?
+            `${apiUrl}/leaderboards/${gameID}/category/${category.id}` :
+            `${apiUrl}/leaderboards/${gameID}/level/${level.id}/${category.id}`,
+            apiOptions);
+         const recordsData = recordsResponse.data.data;
 
-   if (runsElement && runsAmount === 100) {
-      const runsText = await page.evaluate(element => element.textContent, runsElement);
-      const runsMatch = runsText.match(/(\d+)\s*Runs/);
-      runs = runsMatch ? parseInt(runsMatch[1], 10) : 0;
-   } else if (runsAmount) {
-      runs = runsAmount ? parseInt(runsAmount, 10) : 0;
+         const variablesResponse = await axios.get(`${apiUrl}/categories/${category.id}/variables`, apiOptions);
+         const variablesData = variablesResponse.data.data;
+
+         const filteredSubcategories = variablesData.filter(subcategory => {
+            // console.log('subcategory:', subcategory);
+            if (subcategory['is-subcategory']) {
+               if (!level) {
+                  return true;
+               } else {
+                  if (subcategory.scope.type === 'single-level') {
+                     return subcategory.scope.level === level.id;
+                  } else {
+                     return true;
+                  }
+               }
+            }
+            return false;
+         });
+         // console.log('Filtered:', filteredSubcategories);
+
+         const subcategoryCombinations = generateCombinations(filteredSubcategories);
+         // console.log('Subcategories:', subcategoryCombinations);
+
+         if (!isEmpty(subcategoryCombinations)) {
+
+            for (const combination of subcategoryCombinations) {
+               const varNames = [];
+               const queries = [];
+
+               Object.entries(combination).forEach(([varID, valID]) => {
+                  // console.log('varID:', varID);
+                  if (varID.endsWith('_name')) {
+                     varNames.push(valID);
+                  } else {
+                     queries.push(`var-${varID}=${valID}`);
+                  }
+               });
+
+               const queryParameters = queries.join('&');
+
+               if (!queryParameters) continue;
+
+               const apiUrlWithQuery = !level ?
+                  `${apiUrl}/leaderboards/${gameID}/category/${category.id}?${queryParameters}` :
+                  `${apiUrl}/leaderboards/${gameID}/level/${level.id}/${category.id}?${queryParameters}`;
+               const toRequestObjectData = { apiUrlWithQuery, valueNames: varNames.join(' / ') };
+               if (!toRequest.includes(apiUrlWithQuery)) toRequest.push(toRequestObjectData);
+            }
+         } else {
+            const newCategoryObject = createANewCategoryObject(recordsData, category, !level ? officialGameName : `${officialGameName} : ${level.name}`);
+            categoryObjects.push(newCategoryObject);
+         }
+
+      }
+
+      // console.log('toRequest:', toRequest);
+      for (const { apiUrlWithQuery, valueNames } of toRequest) {
+         const requestResponse = await axios.get(apiUrlWithQuery, apiOptions);
+         const requestResponseData = requestResponse.data.data;
+
+         const newSubcategoryObject = createANewCategoryObject(requestResponseData, category, !level ? officialGameName : `${officialGameName} : ${level.name}`, valueNames);
+         categoryObjects.push(newSubcategoryObject);
+      }
    }
-
-   if (wrTimeElement) {
-      const wrTimeText = await page.evaluate(element => element.textContent, wrTimeElement);
-      console.log('WR time:', wrTimeText);
-      const wrTimeMatch = wrTimeText.match(/(?:(\d+)\s*h)?\s*(?:(\d+)\s*m)?\s*(?:(\d+)\s*s)?\s*(?:(\d+)\s*ms)?/);
-      const wrHours = wrTimeMatch ? parseInt(wrTimeMatch[1], 10) || 0 : 0;
-      const wrMinutes = wrTimeMatch ? parseInt(wrTimeMatch[2], 10) || 0 : 0;
-      const wrSeconds = wrTimeMatch ? parseInt(wrTimeMatch[3], 10) || 0 : 0;
-      const wrMiliseconds = wrTimeMatch ? parseInt(wrTimeMatch[4], 10) || 0 : 0;
-      wrTime = wrHours * 3600000 + wrMinutes * 60000 + wrSeconds * 1000 + wrMiliseconds;
-   }
-
-   const category = new Category(link, runs, wrTime);
-   console.log(chalk.magenta(`Created an object. Link: ${link}. Runs: ${runs}. WR Time: ${wrTime}`))
-
-   return category;
 }
 
-export async function scrapeWebsite(link) {
+function createANewCategoryObject(recordsData, category, gameName, variables = "") {
+   const runAmount = recordsData.runs.length;
+   let cost = 1;
 
-   const browserOptions = {
-      headless: 'new',
-      ignoreHTTPSErrors: true
-   };
-   const browser = await puppeteer.launch(browserOptions);
+   if (runAmount >= 15) {
+      const slowRunPlace = Math.floor(runAmount * 0.9) - 1;
+      const fastRunPlace = Math.floor(runAmount * 0.1) - 1;
 
-   if (!validUrlRegex.test(link)) {
-      console.log(chalk.red('INVALID LINK:', link));
-      await browser.close();
-      return;
+      const slowRun = recordsData.runs[slowRunPlace];
+      const fastRun = recordsData.runs[fastRunPlace];
+
+      cost = slowRun.run.times.primary_t / fastRun.run.times.primary_t;
+      if (cost < 1) {
+         cost = 1 / cost;
+      }
    }
 
-   categoriesOutput.length = 0; processedLinks.length = 0; // clears arrays
-   const page = await browser.newPage();
+   const categoryName = `${gameName} - ${category.name} - ${variables}`
+   const runTime = (runAmount !== 0) ? recordsData.runs[0].run.times.primary_t : 0
 
-   await page.setDefaultNavigationTimeout(0); // risks program to get "stuck" :(
-   await page.goto(link);
-
-   const leaderboardElement = await page.$$eval('button div.text-sm.font-medium', (divs) => {
-      return divs.map((div) => div.textContent);
-   });
-   if (leaderboardElement[0] !== 'Leaderboards' && leaderboardElement[0] !== 'Levels') {
-      console.log(chalk.red('INVALID LINK (MUST BE A GAME LEADERBOARD):', link));
-      await browser.close();
-      return;
-   }
-
-   const links = await page.$$eval('a', elements => elements.map(el => el.href));
-   const fullLinks = Array.from(new Set(links.filter(link =>
-      link.includes('?h') &&
-      !link.includes('&page=') &&
-      !link.includes('&rules=') &&
-      !link.includes('#') &&
-      !link.includes('/runs/new')
-   )));
-   const dropdownElements = await page.$$('.x-input-dropdown-button[id]');
-   await dropdownElements[1].evaluate(b => b.click());
-
-   await page.evaluate(() => {
-      const dropdownOptionsElement = document.querySelector('.x-input-dropdown-options.x-custom-scrollbar');
-      dropdownOptionsElement.removeAttribute('style');
-   });
-
-   const refetchedLinks = await page.$$eval('a', elements => elements.map(el => el.href));
-
-   const levelLinks = refetchedLinks.filter(link => !links.includes(link));
-
-   const filteredLinks = [...fullLinks, ...levelLinks];
-
-   const categoryLinksSet = new Set();
-
-   console.log(chalk.greenBright('Going through categories....'));
-
-   for (const filteredLink of filteredLinks) {
-      const categoryLinks = await scrapeCategoryLinks(page, filteredLink, filteredLinks);
-      categoryLinks.forEach(categoryLink => categoryLinksSet.add(categoryLink));
-   }
-
-   // const categoryLinksArray = Array.from(categoryLinksSet);
-   console.log(chalk.black.bgGreen(`Found ${categoriesOutput.length} categories.`));
-
-   await browser.close();
-
-   createExcelSpreadsheet(categoriesOutput);
-
-   return categoriesOutput;
+   const categoryObject = new Category(categoryName, recordsData.runs.length, runTime, cost);
+   console.log(chalk.magenta(`Category analyzed: ${categoryName}`));
+   return categoryObject;
 }
 
-export function createExcelSpreadsheet(categoriesOutput, merge = false) {
-   const workbook = xlsx.utils.book_new();
-   const worksheet = xlsx.utils.json_to_sheet([]);
+function generateCombinations(subcategories) {
+   if (subcategories.length === 0) {
+      return [[]];
+   }
 
-   const headers = ['Category', 'Runs', 'WR Time'];
+   const variableCombinations = [];
 
-   xlsx.utils.sheet_add_aoa(worksheet, [headers], { origin: 'A1' });
+   const [currentSubcategory, ...remainingSubcategories] = subcategories;
+   const currentSubcategoryValues = Object.entries(currentSubcategory.values.values);
 
-   const categoriesData = categoriesOutput
-      .filter((category) => category !== null)
-      .map((category) => [category.link, category.runs, category.wrTime]);
+   for (const [valueID, valueData] of currentSubcategoryValues) {
+      const combinationsForRemaining = generateCombinations(remainingSubcategories);
 
-   xlsx.utils.sheet_add_aoa(worksheet, categoriesData, { origin: 'A2' });
+      for (const combination of combinationsForRemaining) {
+         const combinationWithCurrent = { ...combination, [currentSubcategory.id]: valueID, [`${currentSubcategory.id}_name`]: valueData.label };
+         variableCombinations.push(combinationWithCurrent);
+      }
+   }
 
-   const columnTitleLen = categoriesData.map(row => row[0].length);
-   const maxTitleLen = Math.max(...columnTitleLen);
-   worksheet['!cols'] = [{ width: maxTitleLen + 2 }];
+   // console.log('variableCombinations:', variableCombinations);
+   return variableCombinations;
+}
 
-   xlsx.utils.book_append_sheet(workbook, worksheet, 'Categories');
+export function createExcelSheet(categories, merge = false) {
+   const wb = new excel.Workbook();
+   const ws = wb.addWorksheet('Categories');
+
+   const headerStyle = wb.createStyle({
+      alignment: {
+         horizontal: 'center'
+      },
+      font: {
+         bold: true
+      }
+   });;
+
+   const headers = ['Name', 'Runs', 'WR Time', 'TUC'];
+
+   for (let i = 0; i < headers.length; i++) {
+      ws.cell(1, i + 1).string(headers[i]).style(headerStyle);
+   }
+
+   for (let i = 0; i < categories.length; i++) {
+      const currentCategory = categories[i];
+      const costShortened = currentCategory.cost.toFixed(3);
+      const costFloat = parseFloat(costShortened);
+      ws.cell(i + 2, 1).string(currentCategory.categoryName);
+      ws.cell(i + 2, 2).number(currentCategory.runs);
+      ws.cell(i + 2, 3).number(currentCategory.wrTime);
+      ws.cell(i + 2, 4).number(costFloat);
+   }
+
+   ws.column(1).setWidth(25);
 
    const outputFolder = 'output';
    if (!fs.existsSync(outputFolder)) {
@@ -219,11 +241,10 @@ export function createExcelSpreadsheet(categoriesOutput, merge = false) {
       counter++;
    }
 
-   xlsx.writeFile(workbook, excelFileName);
-
-   if (!merge) {
-      console.log(chalk.green(`Data saved in ${excelFileName}`));
-   } else {
-      console.log(chalk.green(`All MERGED data saved in ${excelFileName}`));
-   }
+   console.log(chalk.green(`Data saved in ${excelFileName}`));
+   wb.write(excelFileName, (err, stats) => {
+      if (err) {
+         console.error('Error!', err);
+      }
+   });
 }
