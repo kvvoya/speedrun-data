@@ -2,7 +2,15 @@ import chalk from 'chalk';
 import fs from 'fs';
 import path from 'path';
 import axios from "axios";
+import axiosRetry from 'axios-retry';
 import excel from 'excel4node';
+import { promisify } from 'util';
+
+const delay = promisify(setTimeout);
+
+axiosRetry(axios, { retries: 10, retryDelay: axiosRetry.exponentialDelay });
+
+
 
 const apiUrl = 'https://speedrun.com/api/v1';
 
@@ -26,9 +34,13 @@ function isEmpty(arr) {
    return Array.isArray(arr) && (arr.length == 0 || arr.every(isEmpty));
 }
 
+// this is a request for Subway Surfers - No Coins - No Hoverboard/No Keys / Mobile.
+// it is so fucking big we just have to skip it entirely
+const DONT_REQUEST_LOL = 'https://speedrun.com/api/v1/leaderboards/y65797de/category/n2y350ed?var-onv47omn=p127j34q&var-j84eeg2n=21gy6p81';
+
 export async function getCategories(gameName) {
+   const categoryObjects = [];
    try {
-      const categoryObjects = [];
 
       const gamesResponse = await axios.get(`${apiUrl}/games?name=${gameName}`, apiOptions);
       const gamesData = gamesResponse.data.data;
@@ -38,14 +50,22 @@ export async function getCategories(gameName) {
          return;
       }
 
+      await delay(1000);
+
       const officialGameName = gamesData[0].names.international;
 
       const gameID = gamesData[0].id;
+      const isSubwaySurfers = gameID === 'y65797de';
+
+      if (isSubwaySurfers)
+         console.log(chalk.red('No Coins for mobile is too big lol, thus it\'s going to be skipped! Isn\'t even a speedrun category.. i just hate tiktok'));
+
       console.log('gameID:', gameID)
 
       await processAnalysis(gameID, officialGameName, categoryObjects);
 
       console.log(chalk.cyan('Full game runs analyzed! Going through ILs...'));
+      await delay(1000);
 
       const levelsResponse = await axios.get(`${apiUrl}/games/${gameID}/levels`, apiOptions);
       const levelsData = levelsResponse.data.data;
@@ -60,6 +80,9 @@ export async function getCategories(gameName) {
 
    } catch (err) {
       console.error('Error:', err);
+      categoryObjects.push(new Category(`Crashed at ${gameName}! Got only ${categoryObjects.length} categories`, 0, 0, 1))
+      createExcelSheet(categoryObjects);
+      return categoryObjects;
    }
 }
 
@@ -69,14 +92,11 @@ async function processAnalysis(gameID, officialGameName, categoryObjects, level 
 
    for (const category of categoriesResponseData) {
       const toRequest = [];
+      await delay(750);
 
       if ((category.type === 'per-game' && !level) || (category.type === 'per-level' && level)) {
-         const recordsResponse = await axios.get(!level ?
-            `${apiUrl}/leaderboards/${gameID}/category/${category.id}` :
-            `${apiUrl}/leaderboards/${gameID}/level/${level.id}/${category.id}`,
-            apiOptions);
-         const recordsData = recordsResponse.data.data;
 
+         await delay(750);
          const variablesResponse = await axios.get(`${apiUrl}/categories/${category.id}/variables`, apiOptions);
          const variablesData = variablesResponse.data.data;
 
@@ -126,6 +146,13 @@ async function processAnalysis(gameID, officialGameName, categoryObjects, level 
                if (!toRequest.includes(apiUrlWithQuery)) toRequest.push(toRequestObjectData);
             }
          } else {
+
+            const recordsResponse = await axios.get(!level ?
+               `${apiUrl}/leaderboards/${gameID}/category/${category.id}` :
+               `${apiUrl}/leaderboards/${gameID}/level/${level.id}/${category.id}`
+               , apiOptions);
+            const recordsData = recordsResponse.data.data;
+
             const newCategoryObject = createANewCategoryObject(recordsData, category, !level ? officialGameName : `${officialGameName} : ${level.name}`);
             categoryObjects.push(newCategoryObject);
          }
@@ -134,6 +161,12 @@ async function processAnalysis(gameID, officialGameName, categoryObjects, level 
 
       // console.log('toRequest:', toRequest);
       for (const { apiUrlWithQuery, valueNames } of toRequest) {
+
+         if (apiUrlWithQuery === DONT_REQUEST_LOL) {
+            continue;
+         }
+
+         await delay(750);
          const requestResponse = await axios.get(apiUrlWithQuery, apiOptions);
          const requestResponseData = requestResponse.data.data;
 
@@ -147,7 +180,7 @@ function createANewCategoryObject(recordsData, category, gameName, variables = "
    const runAmount = recordsData.runs.length;
    let cost = 1;
 
-   if (runAmount >= 15) {
+   if (runAmount >= 10) {
       const slowRunPlace = Math.floor(runAmount * 0.9) - 1;
       const fastRunPlace = Math.floor(runAmount * 0.1) - 1;
 
@@ -189,6 +222,22 @@ function generateCombinations(subcategories) {
 
    // console.log('variableCombinations:', variableCombinations);
    return variableCombinations;
+}
+
+async function retryOnError(fn, maxRetries, retryDelay) {
+   for (let i = 0; i < maxRetries; i++) {
+      try {
+         return await fn();
+      } catch (error) {
+         if (error.response && error.response.status[0] === 5) {
+            console.log(`Recieved a 503 error. Retrying after ${retryDelay / 1000} seconds...`);
+            await delay(retryDelay);
+         } else {
+            throw error;
+         }
+      }
+   }
+   throw new Error(`Max retries reached for 503 case`);
 }
 
 export function createExcelSheet(categories, merge = false) {

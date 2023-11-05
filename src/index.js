@@ -86,7 +86,6 @@ async function mergeStatsLogic(links) {
       const categoriesOutput = await getCategories(link);
       allCategoriesOutput.push(...categoriesOutput);
    }
-
    createExcelSheet(allCategoriesOutput, true);
 }
 
